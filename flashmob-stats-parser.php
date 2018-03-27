@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Flashmob Stats Parser
- * Description: Parses stats from <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
+ * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
  * Version: 1.0.0
