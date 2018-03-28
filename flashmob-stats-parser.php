@@ -4,7 +4,7 @@
  * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
- * Version: 1.2.0
+ * Version: 1.2.1
  */
 
 class FSP{
@@ -43,7 +43,7 @@ class FSP{
       'iSeasonStartDay'   => 0,
     );
     $bSave = false;
-    foreach ($aOptionDefaults as $key => $val) {
+    foreach ($this->aOptionDefaults as $key => $val) {
       if (!isset($this->aOptions[$key])) {
         $this->aOptions[$key] = $val;
         $bSave = true;
