@@ -4,7 +4,7 @@
  * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
- * Version: 1.1.0
+ * Version: 1.2.0
  */
 
 class FSP{
@@ -14,6 +14,7 @@ class FSP{
   private $strDefaultField = "countries";
   private $strOptionsPageSlug = "fsp-options";
   private $strOptionKey = "fsp-options";
+  private $aOptionDefaults = array();
   private $strStatsKey = "fsp-stats";
   private $aMonths = array();
   private $bIsSeason = false;
@@ -34,9 +35,26 @@ class FSP{
     $this->aOptions = get_option( $this->strOptionKey, array() );
     $this->aStats = get_option( $this->strStatsKey , array() );
 
+    $this->aOptionDefaults = array(
+      'bEnableCron'       => false,
+      'iSeasonEndMonth'   => 0,
+      'iSeasonStartMonth' => 0,
+      'iSeasonEndDay'     => 0,
+      'iSeasonStartDay'   => 0,
+    );
+    $bSave = false;
+    foreach ($aOptionDefaults as $key => $val) {
+      if (!isset($this->aOptions[$key])) {
+        $this->aOptions[$key] = $val;
+        $bSave = true;
+      }
+    }
+    if ($bSave) {
+      update_option( $this->strOptionKey, $this->aOptions, true );
+    }
+    
     $this->iYear = $this->get_current_year();
     $this->bIsSeason = $this->isSeason();
-    
     
     if (empty($this->aStats)) {
       $this->aStats = $this->fsp_cron( true );
@@ -140,6 +158,7 @@ class FSP{
     // echo "<pre>" .var_export($this->aOptions, true). "</pre>";
     // echo "<pre>" .var_export($this->iYear, true). "</pre>";
     // echo "<pre>" .var_export($this->bIsSeason, true). "</pre>";
+    
     if ($this->aOptions['bEnableCron'] === true) {
       $strEnableCronChecked = 'checked="checked"';
     } else {
@@ -165,17 +184,35 @@ class FSP{
       $strOptionsMonthsStart .= '<option value="'.$i.'" '.$strSelectedStart.'>'.$strMonthName.'</option>';
       $strOptionsMonthsEnd .= '<option value="'.$i.'" '.$strSelectedEnd.'>'.$strMonthName.'</option>';
     }
+    $strOptionsDaysStart = "";
+    $strOptionsDaysEnd = "";
+    $iSeasonStartDay = $this->aOptions["iSeasonStartDay"];
+    $iSeasonEndDay = $this->aOptions["iSeasonEndDay"];
+    for ($i = 1; $i <= 31; $i++) {
+      if ($iSeasonStartDay == $i) {
+        $strSelectedStart = 'selected="selected"';
+      } else {
+        $strSelectedStart = '';
+      }
+      if ($iSeasonEndDay == $i) {
+        $strSelectedEnd = 'selected="selected"';
+      } else {
+        $strSelectedEnd = '';
+      }
+      $strOptionsDaysStart .= '<option value="'.$i.'" '.$strSelectedStart.'>'.$i.'</option>';
+      $strOptionsDaysEnd .= '<option value="'.$i.'" '.$strSelectedEnd.'>'.$i.'</option>';
+    }
     
-    $strSeasonPlaceholder = ($this->bIsSeason) ? '%%inSeason%% %%labelCurrentSeason%%' : '%%outOfSeason%%';
+    $strSeasonPlaceholder = ($this->bIsSeason) ? '%%inSeason%% %%labelCurrentSeason%%' : '%%outOfSeason%% %%labelNextSeason%%';
     echo str_replace(
       array(
         '%%enableCronChecked%%', "%%enableCronCheckedLabel%%", "%%seasonStartLabel%%", "%%seasonEndLabel%%", "%%saveButtonLabel%%",
-        "%%optionsMothsStart%%", "%%optionsMothsEnd%%", "%%seasonInfo%%",
-        "%%inSeason%%", "%%outOfSeason%%", "%%labelCurrentSeason%%", ),
+        "%%optionsMonthsStart%%", "%%optionsMonthsEnd%%", "%%optionsDaysStart%%", "%%optionsDaysEnd%%", "%%seasonInfo%%",
+        "%%inSeason%%", "%%outOfSeason%%", "%%labelCurrentSeason%%", "%%labelNextSeason%%", ),
       array(
         $strEnableCronChecked, __( "Enable Cron?", 'fsp' ), __( "Start of International Flashmob Season", 'fsp' ), __( "End of International Flashmob Season", 'fsp' ), __( "Save", 'fsp' ),
-        $strOptionsMonthsStart, $strOptionsMonthsEnd, __( "Info: Outside of Season, the cron is disabled. End of Season Month's year is taken as current season.", 'fsp' ),
-        __( "We are IN season, currently.", 'fsp' ), __( "We are NOT in season, currently.", 'fsp' ), __( "Current season: ", 'fsp' ). $this->iYear .".", ),
+        $strOptionsMonthsStart, $strOptionsMonthsEnd, $strOptionsDaysStart, $strOptionsDaysEnd, __( "Info: Outside of Season, the cron is disabled. End of Season Month's year is taken as current season.", 'fsp' ),
+        __( "We are IN season, currently.", 'fsp' ), __( "We are NOT in season, currently.", 'fsp' ), __( "Current season: ", 'fsp' ). $this->iYear .".", __( "Next season: ", 'fsp' ). $this->iYear .".", ),
       '
         <form action="" method="post">
           <table style="width: 100%">
@@ -186,12 +223,12 @@ class FSP{
               </td>
             </tr>
             <tr>
-              <th style="width: 47%; padding: 0 1%; text-align: right;"><label for="fsp_season_start">%%seasonStartLabel%%</label></th>
-              <td><select id="fsp_season_start" name="fsp_season_start">%%optionsMothsStart%%</select></td>
+              <th style="width: 47%; padding: 0 1%; text-align: right;"><label for="fsp_season_month_start">%%seasonStartLabel%%</label></th>
+              <td><select id="fsp_season_month_start" name="fsp_season_month_start">%%optionsMonthsStart%%</select> / <select id="fsp_season_day_start" name="fsp_season_day_start">%%optionsDaysStart%%</select></td>
             </tr>
             <tr>
-              <th style="width: 47%; padding: 0 1%; text-align: right;"><label for="fsp_season_end">%%seasonEndLabel%%</label></th>
-              <td><select id="fsp_season_end" name="fsp_season_end">%%optionsMothsEnd%%</select></td>
+              <th style="width: 47%; padding: 0 1%; text-align: right;"><label for="fsp_season_month_end">%%seasonEndLabel%%</label></th>
+              <td><select id="fsp_season_month_end" name="fsp_season_month_end">%%optionsMonthsEnd%%</select> / <select id="fsp_season_day_end" name="fsp_season_day_end">%%optionsDaysEnd%%</select></td>
             </tr>
             <tr>
               <th colspan="2">
@@ -217,9 +254,11 @@ class FSP{
   private function save_option_page_options( $aPostedOptions ) {
     // echo "<pre>" .var_export($aPostedOptions, true). "</pre>";
     $aOptionsToSave = array(
-      'bEnableCron'     => (isset($aPostedOptions['fsp_enable_cron']) && $aPostedOptions['fsp_enable_cron'] === '1'),
-      'iSeasonEndMonth' => isset($aPostedOptions['fsp_season_end']) ? intval($aPostedOptions['fsp_season_end']) : 0,
-      'iSeasonStartMonth' => isset($aPostedOptions['fsp_season_start']) ? intval($aPostedOptions['fsp_season_start']) : 0,
+      'bEnableCron'       => (isset($aPostedOptions['fsp_enable_cron']) && $aPostedOptions['fsp_enable_cron'] === '1'),
+      'iSeasonEndMonth'   => isset($aPostedOptions['fsp_season_month_end']) ? intval($aPostedOptions['fsp_season_month_end']) : $this->aOptionDefaults['iSeasonEndMonth'],
+      'iSeasonStartMonth' => isset($aPostedOptions['fsp_season_month_start']) ? intval($aPostedOptions['fsp_season_month_start']) : $this->aOptionDefaults['iSeasonStartMonth'],
+      'iSeasonEndDay'     => isset($aPostedOptions['fsp_season_day_end']) ? intval($aPostedOptions['fsp_season_day_end']) : $this->aOptionDefaults['iSeasonEndDay'],
+      'iSeasonStartDay'   => isset($aPostedOptions['fsp_season_day_start']) ? intval($aPostedOptions['fsp_season_day_start']) : $this->aOptionDefaults['iSeasonStartDay'],
     );
     update_option( $this->strOptionKey, $aOptionsToSave, true );
     $this->aOptions = $aOptionsToSave;
@@ -286,38 +325,74 @@ class FSP{
       if ($iAttrYear > 0) {
         $iYear = $iAttrYear;
       }
+    } else {
+      $bAllFieldsPresent = true;
+      foreach ($this->aFields as $strField) {
+        if (!isset($this->aStats[$iYear][$strField])) {
+          $bAllFieldsPresent = false;
+          break;
+        }
+      }
+      if (!$bAllFieldsPresent) {
+        // Year was not set and current season doesn't have any stats yet => Get last year with stats //
+        krsort($this->aStats);
+        foreach ($this->aStats as $iStatsYear => $aStatsOfYear) {
+          if (!empty($aStatsOfYear)) {
+            $bAllFieldsPresent = true;
+            foreach ($this->aFields as $strField) {
+              if (!isset($aStatsOfYear[$strField])) {
+                $bAllFieldsPresent = false;
+                break;
+              }
+            }
+            if ($bAllFieldsPresent) {
+              return $iStatsYear;
+            }
+          }
+        }
+      }
     }
     return $iYear;
   }
   
   private function get_current_year() {
-    if (!isset($this->aOptions['iSeasonEndMonth'])) {
-      return intval( date( "Y" ) );
+    $iSeasonEndMonth = $this->aOptions["iSeasonEndMonth"];
+    $iSeasonEndDay = $this->aOptions["iSeasonEndDay"];
+    $iSeasonEnd = $iSeasonEndMonth * 100 + $iSeasonEndDay;
+
+    $iMonthDayNow = intval(date( 'n' )) * 100 + intval(date( 'j' ));
+    $iYearNow = intval( date( "Y" ) );
+
+    if ($iMonthDayNow <= $iSeasonEnd) {
+      // We are before the end of season //
+      return $iYearNow;
+    } else {
+      // We are after the end of season //
+      return $iYearNow + 1;
     }
-    
-    $iYear = intval( date( "Y", mktime(2, 0, 0, date("n") - $this->aOptions['iSeasonEndMonth'], 1, date('Y'))) ) + 1;
-    return $iYear;
-    
   }
   
   private function isSeason() {
-    if (!isset($this->aOptions["iSeasonStartMonth"]) || !isset($this->aOptions["iSeasonEndMonth"])) {
-      return true;
-    }
     $iSeasonStartMonth = $this->aOptions["iSeasonStartMonth"];
-    $iSeasonEndMonth = $this->aOptions["iSeasonEndMonth"];
-    $iMonthNow = intval(date( 'n' ));
+    $iSeasonStartDay = $this->aOptions["iSeasonStartDay"];
+    $iSeasonStart = $iSeasonStartMonth * 100 + $iSeasonStartDay;
     
-    if ($iSeasonStartMonth == $iSeasonEndMonth ) {
+    $iSeasonEndMonth = $this->aOptions["iSeasonEndMonth"];
+    $iSeasonEndDay = $this->aOptions["iSeasonEndDay"];
+    $iSeasonEnd = $iSeasonEndMonth * 100 + $iSeasonEndDay;
+    
+    $iMonthDayNow = intval(date( 'n' )) * 100 + intval(date( 'j' ));
+    
+    if ($iSeasonStart == $iSeasonEnd ) {
       return true;
-    } elseif ($iSeasonStartMonth < $iSeasonEndMonth && ($iSeasonStartMonth > $iMonthNow || $iSeasonEndMonth < $iMonthNow)) {
+    } elseif ($iSeasonStart < $iSeasonEnd && ($iSeasonStart > $iMonthDayNow || $iSeasonEnd < $iMonthDayNow)) {
       // We are NOT BETWEEN start and end // 
       return false;
-    } elseif ($iSeasonStartMonth > $iSeasonEndMonth && ($iSeasonEndMonth < $iMonthNow && $iSeasonStartMonth > $iMonthNow)) {
+    } elseif ($iSeasonStart > $iSeasonEnd && ($iSeasonEnd < $iMonthDayNow && $iSeasonStart > $iMonthDayNow)) {
       // We are BETWEEN end and start //
       return false;
     }
-    // var_dump($iSeasonStartMonth, $iSeasonEndMonth, $iMonthNow);
+    // var_dump($iSeasonStart, $iSeasonEndMonth, $iMonthDayNow);
     return true;
   }
 }
