@@ -4,7 +4,7 @@
  * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
- * Version: 1.2.1
+ * Version: 1.2.2
  */
 
 class FSP{
@@ -15,6 +15,7 @@ class FSP{
   private $strOptionsPageSlug = "fsp-options";
   private $strOptionKey = "fsp-options";
   private $aOptionDefaults = array();
+  private $aOptions = array();
   private $strStatsKey = "fsp-stats";
   private $aMonths = array();
   private $bIsSeason = false;
@@ -94,7 +95,7 @@ class FSP{
     // return; // turned off 2017/04/09 //
     // return; // turned on  2017/12/26 //
     
-    $bEnableCron = (isset($aPostedOptions['fsp_enable_cron']) && $aPostedOptions['fsp_enable_cron'] === true) && $this->bIsSeason;
+    $bEnableCron = (isset($this->aOptions['bEnableCron']) && $this->aOptions['bEnableCron'] === true) && $this->bIsSeason;
 
     if (!$bEnableCron) {
       if ($bFixValues) {
