@@ -4,7 +4,7 @@
  * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
- * Version: 1.2.2
+ * Version: 1.2.3
  */
 
 class FSP{
@@ -22,6 +22,7 @@ class FSP{
   
   public function __construct() {
     add_action( 'fsp_cron', array( $this, 'fsp_cron' ) );
+    add_action( 'fsp_cron_scheduler', array( $this, 'fsp_cron_scheduler' ) );
     add_shortcode( 'fsp-stats-allstats', array( $this, 'allstats' ));
     add_shortcode( 'fsp-stats-countries', array( $this, 'countries' ));
     add_shortcode( 'fsp-stats-cities', array( $this, 'cities' ));
@@ -42,6 +43,8 @@ class FSP{
       'iSeasonStartMonth' => 0,
       'iSeasonEndDay'     => 0,
       'iSeasonStartDay'   => 0,
+      'iFlashmobDay'      => 0,
+      'iFlashmobMonth'    => 0,
     );
     $bSave = false;
     foreach ($this->aOptionDefaults as $key => $val) {
@@ -80,15 +83,39 @@ class FSP{
       );
       update_option( $this->strStatsKey, $this->aStats, true );
     }
+
+    if ( !wp_next_scheduled( 'fsp_cron_scheduler' ) ) {
+      wp_schedule_event( time(), 'hourly', 'fsp_cron_scheduler');
+    }
   }
   
   public static function fsp_activate() {
+    $strSchedule = $this->isFlashmobDay() ? 'hourly' : 'twicedaily';
     if ( !wp_next_scheduled( 'fsp_cron' ) ) {
-      wp_schedule_event( time(), 'twicedaily', 'fsp_cron');
+      wp_schedule_event( time(), $strSchedule, 'fsp_cron');
+    }
+    if ( !wp_next_scheduled( 'fsp_cron_scheduler' ) ) {
+      wp_schedule_event( time(), 'hourly', 'fsp_cron_scheduler');
     }
   }
   public static function fsp_deactivate() {
     wp_clear_scheduled_hook('fsp_cron');
+    wp_clear_scheduled_hook('fsp_cron_scheduler');
+  }
+
+  public function fsp_cron_scheduler() {
+    $strSchedule = $this->isFlashmobDay() ? 'hourly' : 'twicedaily';
+    if ( !wp_next_scheduled( 'fsp_cron' ) ) {
+      wp_schedule_event( time(), $strSchedule, 'fsp_cron');
+    } else {
+      $strScheduleCurrent = wp_get_schedule( 'fsp_cron' );
+      if ($strScheduleCurrent != $strSchedule) {
+        if (false !== $strScheduleCurrent) {
+          wp_clear_scheduled_hook('fsp_cron');
+        }
+        wp_schedule_event( time(), $strSchedule, 'fsp_cron');
+      }
+    }
   }
   
   public function fsp_cron( $bFixValues = false ) {
@@ -155,7 +182,7 @@ class FSP{
     if (isset($_POST['save-fsp-options'])) {
       $this->save_option_page_options($_POST);
     }
-    
+
     // echo "<pre>" .var_export($this->aOptions, true). "</pre>";
     // echo "<pre>" .var_export($this->iYear, true). "</pre>";
     // echo "<pre>" .var_export($this->bIsSeason, true). "</pre>";
@@ -168,8 +195,10 @@ class FSP{
     
     $strOptionsMonthsStart = "";
     $strOptionsMonthsEnd = "";
+    $strOptionsMonthsFlashmob = "";
     $iSeasonStartMonth = $this->aOptions["iSeasonStartMonth"];
     $iSeasonEndMonth = $this->aOptions["iSeasonEndMonth"];
+    $iFlashmobMonth = $this->aOptions["iFlashmobMonth"];
     for ($i = 1; $i <= 12; $i++) {
       if ($iSeasonStartMonth == $i) {
         $strSelectedStart = 'selected="selected"';
@@ -181,14 +210,22 @@ class FSP{
       } else {
         $strSelectedEnd = '';
       }
+      if ($iFlashmobMonth == $i) {
+        $strSelectedFlashmob = 'selected="selected"';
+      } else {
+        $strSelectedFlashmob = '';
+      }
       $strMonthName = __( date('F', mktime(0, 0, 0, $i, 1, date('Y'))), 'fsp' );
       $strOptionsMonthsStart .= '<option value="'.$i.'" '.$strSelectedStart.'>'.$strMonthName.'</option>';
       $strOptionsMonthsEnd .= '<option value="'.$i.'" '.$strSelectedEnd.'>'.$strMonthName.'</option>';
+      $strOptionsMonthsFlashmob .= '<option value="'.$i.'" '.$strSelectedFlashmob.'>'.$strMonthName.'</option>';
     }
     $strOptionsDaysStart = "";
     $strOptionsDaysEnd = "";
+    $strOptionsDaysFlashmob = "";
     $iSeasonStartDay = $this->aOptions["iSeasonStartDay"];
     $iSeasonEndDay = $this->aOptions["iSeasonEndDay"];
+    $iFlashmobDay = $this->aOptions["iFlashmobDay"];
     for ($i = 1; $i <= 31; $i++) {
       if ($iSeasonStartDay == $i) {
         $strSelectedStart = 'selected="selected"';
@@ -200,20 +237,26 @@ class FSP{
       } else {
         $strSelectedEnd = '';
       }
+      if ($iFlashmobDay == $i) {
+        $strSelectedFlashmob = 'selected="selected"';
+      } else {
+        $strSelectedFlashmob = '';
+      }
       $strOptionsDaysStart .= '<option value="'.$i.'" '.$strSelectedStart.'>'.$i.'</option>';
       $strOptionsDaysEnd .= '<option value="'.$i.'" '.$strSelectedEnd.'>'.$i.'</option>';
+      $strOptionsDaysFlashmob .= '<option value="'.$i.'" '.$strSelectedFlashmob.'>'.$i.'</option>';
     }
     
     $strSeasonPlaceholder = ($this->bIsSeason) ? '%%inSeason%% %%labelCurrentSeason%%' : '%%outOfSeason%% %%labelNextSeason%%';
     echo str_replace(
       array(
         '%%enableCronChecked%%', "%%enableCronCheckedLabel%%", "%%seasonStartLabel%%", "%%seasonEndLabel%%", "%%saveButtonLabel%%",
-        "%%optionsMonthsStart%%", "%%optionsMonthsEnd%%", "%%optionsDaysStart%%", "%%optionsDaysEnd%%", "%%seasonInfo%%",
-        "%%inSeason%%", "%%outOfSeason%%", "%%labelCurrentSeason%%", "%%labelNextSeason%%", ),
+        "%%optionsMonthsStart%%", "%%optionsMonthsEnd%%", "%%optionsDaysStart%%", "%%optionsDaysEnd%%", "%%seasonInfo%%", "%%optionsMonthsFlashmob%%", "%%optionsDaysFlashmob%%",
+        "%%inSeason%%", "%%outOfSeason%%", "%%labelCurrentSeason%%", "%%labelNextSeason%%", "%%seasonFlashmobLabel%%", ),
       array(
         $strEnableCronChecked, __( "Enable Cron?", 'fsp' ), __( "Start of International Flashmob Season", 'fsp' ), __( "End of International Flashmob Season", 'fsp' ), __( "Save", 'fsp' ),
-        $strOptionsMonthsStart, $strOptionsMonthsEnd, $strOptionsDaysStart, $strOptionsDaysEnd, __( "Info: Outside of Season, the cron is disabled. End of Season Month's year is taken as current season.", 'fsp' ),
-        __( "We are IN season, currently.", 'fsp' ), __( "We are NOT in season, currently.", 'fsp' ), __( "Current season: ", 'fsp' ). $this->iYear .".", __( "Next season: ", 'fsp' ). $this->iYear .".", ),
+        $strOptionsMonthsStart, $strOptionsMonthsEnd, $strOptionsDaysStart, $strOptionsDaysEnd, __( "Info: Outside of Season, the cron is disabled. End of Season Month's year is taken as current season.", 'fsp' ), $strOptionsMonthsFlashmob, $strOptionsDaysFlashmob,
+        __( "We are IN season, currently.", 'fsp' ), __( "We are NOT in season, currently.", 'fsp' ), __( "Current season: ", 'fsp' ). $this->iYear .".", __( "Next season: ", 'fsp' ). $this->iYear .".", __("Day of Flashmob", 'fsp') ),
       '
         <form action="" method="post">
           <table style="width: 100%">
@@ -235,6 +278,10 @@ class FSP{
               <th colspan="2">
                 <span style="font-size: smaller;">%%seasonInfo%%</span>
               </th>
+            </tr>
+            <tr>
+              <th style="width: 47%; padding: 0 1%; text-align: right;"><label for="fsp_flashmob_month">%%seasonFlashmobLabel%%</label></th>
+              <td><select id="fsp_flashmob_month" name="fsp_flashmob_month">%%optionsMonthsFlashmob%%</select> / <select id="fsp_flashmob_day" name="fsp_flashmob_day">%%optionsDaysFlashmob%%</select></td>
             </tr>
             <tr>
               <th colspan="2">
@@ -260,6 +307,8 @@ class FSP{
       'iSeasonStartMonth' => isset($aPostedOptions['fsp_season_month_start']) ? intval($aPostedOptions['fsp_season_month_start']) : $this->aOptionDefaults['iSeasonStartMonth'],
       'iSeasonEndDay'     => isset($aPostedOptions['fsp_season_day_end']) ? intval($aPostedOptions['fsp_season_day_end']) : $this->aOptionDefaults['iSeasonEndDay'],
       'iSeasonStartDay'   => isset($aPostedOptions['fsp_season_day_start']) ? intval($aPostedOptions['fsp_season_day_start']) : $this->aOptionDefaults['iSeasonStartDay'],
+      'iFlashmobDay'     => isset($aPostedOptions['fsp_flashmob_day']) ? intval($aPostedOptions['fsp_flashmob_day']) : $this->aOptionDefaults['iFlashmobDay'],
+      'iFlashmobMonth'   => isset($aPostedOptions['fsp_flashmob_month']) ? intval($aPostedOptions['fsp_flashmob_month']) : $this->aOptionDefaults['iFlashmobMonth'],
     );
     update_option( $this->strOptionKey, $aOptionsToSave, true );
     $this->aOptions = $aOptionsToSave;
@@ -395,6 +444,16 @@ class FSP{
     }
     // var_dump($iSeasonStart, $iSeasonEndMonth, $iMonthDayNow);
     return true;
+  }
+
+  private function isFlashmobDay() {
+    $iFlashmobMonth = $this->aOptions['iFlashmobMonth'];
+    $iFlashmobDay = $this->aOptions['iFlashmobDay'];
+
+    $iMonthDayFlashmob = $iFlashmobMonth * 100 + $iFlashmobDay;
+    $iMonthDayNow = intval(date( 'n' )) * 100 + intval(date( 'j' ));
+
+    return ($iMonthDayFlashmob == $iMonthDayNow);
   }
 }
 
