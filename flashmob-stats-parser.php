@@ -4,7 +4,7 @@
  * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
- * Version: 1.2.3
+ * Version: 1.2.4
  */
 
 class FSP{
@@ -167,12 +167,14 @@ class FSP{
   }
 
   public function action__add_options_page() {
-    add_options_page(
+    add_menu_page(
       __( "International Flashmob Stats Parser", "fsp" ),
-      __( "International Flashmob Stats Parser", "fsp" ),
+      __( "Flashmob Stats Parser", "fsp" ),
       "manage_options",
       $this->strOptionsPageSlug,
-      array( $this, "options_page" )
+      array( $this, "options_page" ),
+      'dashicons-search',
+      58
     );
   }
 
