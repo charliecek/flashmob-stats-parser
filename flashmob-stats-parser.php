@@ -177,7 +177,7 @@ class FSP{
   }
 
   public function options_page() {
-    echo "<h1>" . __("International Flashmob Stats Parser Settings", "fsp" ) . "</h1>";
+    echo "<div class=\"wrap\"><h1>" . __("International Flashmob Stats Parser Settings", "fsp" ) . "</h1>";
 
     if (isset($_POST['save-fsp-options'])) {
       $this->save_option_page_options($_POST);
@@ -295,6 +295,7 @@ class FSP{
           </span>
           
         </form>
+        </div><!-- .wrap -->
       '
     );
   }
