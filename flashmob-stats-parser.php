@@ -4,11 +4,12 @@
  * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
- * Version: 1.2.4
+ * Version: 1.2.5
  */
 
 class FSP{
   private $aStats = array();
+  private $aShortcodes;
   private $iYear = 0;
   private $aFields = array();
   private $strDefaultField = "countries";
@@ -21,19 +22,48 @@ class FSP{
   private $bIsSeason = false;
   
   public function __construct() {
+    $this->aFields = array( $this->strDefaultField, "cities", "locations", "update-timestamp" );
+
     add_action( 'fsp_cron', array( $this, 'fsp_cron' ) );
     add_action( 'fsp_cron_scheduler', array( $this, 'fsp_cron_scheduler' ) );
-    add_shortcode( 'fsp-stats-allstats', array( $this, 'allstats' ));
-    add_shortcode( 'fsp-stats-countries', array( $this, 'countries' ));
-    add_shortcode( 'fsp-stats-cities', array( $this, 'cities' ));
-    add_shortcode( 'fsp-stats-locations', array( $this, 'locations' ));
-    add_shortcode( 'fsp-stats-update_time', array( $this, 'update_time' ));
-    add_shortcode( 'fsp-counter', array( $this, 'counter' ));
-    
+
+    $this->aShortcodes = array(
+      'fsp-stats-allstats'    => 'allstats',
+      'fsp-stats-countries'   => array(
+        'method'          => 'countries',
+        'example-args'    => 'year=2018',
+        'info'            => ' <small>(arguments: year)</small>',
+      ),
+      'fsp-stats-cities'      => array(
+        'method'          => 'cities',
+        'info'            => ' <small>(arguments: year)</small>',
+      ),
+      'fsp-stats-locations'   => array(
+        'method'          => 'locations',
+        'info'            => ' <small>(arguments: year)</small>',
+      ),
+      'fsp-stats-update_time' => array(
+        'method'          => 'update_time',
+        'info'            => ' <small>(arguments: year)</small>',
+      ),
+      'fsp-counter'           => array(
+        'method'          => 'counter',
+        'example-args'    => 'what="countries" title="COUNTRIES"',
+        'info'            => ' <small>(arguments: year, what [' . implode('|', $this->aFields) . "], title)</small>",
+        'front-end-only'  => true,
+      ),
+    );
+
+    foreach( $this->aShortcodes as $strShortcode => $mixMethod ) {
+      if (is_array($mixMethod)) {
+        add_shortcode( $strShortcode, array( $this, $mixMethod['method'] ));
+      } else {
+        add_shortcode( $strShortcode, array( $this, $mixMethod ));
+      }
+    }
+
     add_action( 'admin_menu', array( $this, "action__add_options_page" ) );
 
-    $this->aFields = array( $this->strDefaultField, "cities", "locations", "update-timestamp" );
-    
     $this->aOptions = get_option( $this->strOptionKey, array() );
     $this->aStats = get_option( $this->strStatsKey , array() );
 
@@ -297,9 +327,33 @@ class FSP{
           </span>
           
         </form>
-        </div><!-- .wrap -->
-      '
+        <h2 class="shortcode-examples-h2">' . __( "Shortcode Examples", "fsp" ) . '</h2>
+        <div class="shortcode-examples">' . PHP_EOL
     );
+    foreach( $this->aShortcodes as $strShortcode => $mixMethod ) {
+      $bDoShortcode = true;
+      $strInfo = "";
+      $strShortcodeExample = '['.$strShortcode;
+      if (is_array($mixMethod)) {
+        if (isset($mixMethod['example-args'])) {
+          $strShortcodeExample .= ' ' . $mixMethod['example-args'];
+        }
+        $bDoShortcode = !isset($mixMethod['front-end-only']) || !$mixMethod['front-end-only'];
+        if (isset($mixMethod['info'])) {
+          $strInfo = $mixMethod['info'];
+        }
+      }
+      $strShortcodeExample .= ']';
+      echo '<h3><code>' . $strShortcodeExample . '</code>' . $strInfo . '</h3>'.PHP_EOL;
+      if ($bDoShortcode) {
+        echo '<p>' . do_shortcode($strShortcodeExample) . '</p>'.PHP_EOL;
+      } else {
+        echo '<p><small>' . __( "This shortcode only works on the front-end.", "fsp" ) . '</small></p>'.PHP_EOL;
+      }
+    }
+    echo  '
+        </div><!-- .shortcode-examples -->
+      </div><!-- .wrap -->'.PHP_EOL;
   }
   
   private function save_option_page_options( $aPostedOptions ) {
