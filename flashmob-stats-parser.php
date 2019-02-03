@@ -4,7 +4,7 @@
  * Description: Parses Stats From <a href="https://flashmob.dileque.si" target="_blank">flashmob.dileque.si</a> And Provides Stats Shortcodes
  * Author: charliecek
  * Author URI: http://charliecek.eu/
- * Version: 1.2.5
+ * Version: 1.2.6
  */
 
 class FSP{
@@ -20,7 +20,7 @@ class FSP{
   private $strStatsKey = "fsp-stats";
   private $aMonths = array();
   private $bIsSeason = false;
-  
+
   public function __construct() {
     $this->aFields = array( $this->strDefaultField, "cities", "locations", "update-timestamp" );
 
@@ -62,7 +62,7 @@ class FSP{
       }
     }
 
-    add_action( 'admin_menu', array( $this, "action__add_options_page" ) );
+    add_action( 'admin_menu', array( $this, "action__add_options_page" ), 11 );
 
     $this->aOptions = get_option( $this->strOptionKey, array() );
     $this->aStats = get_option( $this->strStatsKey , array() );
@@ -86,10 +86,10 @@ class FSP{
     if ($bSave) {
       update_option( $this->strOptionKey, $this->aOptions, true );
     }
-    
+
     $this->iYear = $this->get_current_year();
     $this->bIsSeason = $this->isSeason();
-    
+
     if (empty($this->aStats)) {
       $this->aStats = $this->fsp_cron( true );
     } else if ($this->aStats[$this->strDefaultField] ) {
@@ -103,7 +103,7 @@ class FSP{
     if (!isset($this->aStats[$this->iYear])) {
       $this->aStats = $this->fsp_cron( true );
     }
-    
+
     if (!isset($this->aStats[2017])) {
       $this->aStats[2017] = array(
         'countries'         => 57,
@@ -118,7 +118,7 @@ class FSP{
       wp_schedule_event( time(), 'hourly', 'fsp_cron_scheduler');
     }
   }
-  
+
   public static function fsp_activate() {
     $strSchedule = $this->isFlashmobDay() ? 'hourly' : 'twicedaily';
     if ( !wp_next_scheduled( 'fsp_cron' ) ) {
@@ -147,11 +147,11 @@ class FSP{
       }
     }
   }
-  
+
   public function fsp_cron( $bFixValues = false ) {
     // return; // turned off 2017/04/09 //
     // return; // turned on  2017/12/26 //
-    
+
     $bEnableCron = (isset($this->aOptions['bEnableCron']) && $this->aOptions['bEnableCron'] === true) && $this->bIsSeason;
 
     if (!$bEnableCron) {
@@ -169,43 +169,54 @@ class FSP{
       }
       return;
     }
-    
+
     $aStatsCurrent = array();
-    
+
     $html = file_get_contents('https://flashmob.dileque.si');
-    
+
     $dom = new DOMDocument();
     $internalErrors = libxml_use_internal_errors(true);
     $dom->loadHTML($html);
     libxml_use_internal_errors($internalErrors);
-    
+
     $xpath = new \DomXPath($dom);
 
     $aStatsCurrent["countries"] = trim($xpath->evaluate("string(//div[@id='stats']//div[@class='statscountries']//span[@class='number'])"));
     $aStatsCurrent["cities"] = trim($xpath->evaluate("string(//div[@id='stats']//div[@class='statscities']//span[@class='number'])"));
     $aStatsCurrent["locations"] = trim($xpath->evaluate("string(//div[@id='stats']//div[@class='statslocations']//span[@class='number'])"));
     $aStatsCurrent["update-timestamp"] = time();
-    
+
     $aStats = $this->aStats;
     $aStats[$this->iYear] = $aStatsCurrent;
-    
+
     update_option( $this->strStatsKey, $aStats, true );
-    
+
     if ($bFixValues) {
       return get_option($this->strStatsKey, array());
     }
   }
 
   public function action__add_options_page() {
-    add_menu_page(
-      __( "International Flashmob Stats Parser", "fsp" ),
-      __( "Flashmob Stats Parser", "fsp" ),
-      "manage_options",
-      $this->strOptionsPageSlug,
-      array( $this, "options_page" ),
-      'dashicons-search',
-      58
-    );
+    if (class_exists("FLORP") && function_exists("florp_is_intf_blog") && florp_is_intf_blog()) {
+      add_submenu_page(
+        'florp-international',
+        __( "International Flashmob Stats Parser", "fsp" ),
+        __( "Stats Parser", "fsp" ),
+        'manage_options',
+        'fsp',
+        array( $this, "options_page" )
+      );
+    } else {
+      add_menu_page(
+        __( "International Flashmob Stats Parser", "fsp" ),
+        __( "Flashmob Stats Parser", "fsp" ),
+        "manage_options",
+        $this->strOptionsPageSlug,
+        array( $this, "options_page" ),
+        'dashicons-search',
+        58
+      );
+    }
   }
 
   public function options_page() {
@@ -218,13 +229,13 @@ class FSP{
     // echo "<pre>" .var_export($this->aOptions, true). "</pre>";
     // echo "<pre>" .var_export($this->iYear, true). "</pre>";
     // echo "<pre>" .var_export($this->bIsSeason, true). "</pre>";
-    
+
     if ($this->aOptions['bEnableCron'] === true) {
       $strEnableCronChecked = 'checked="checked"';
     } else {
       $strEnableCronChecked = '';
     }
-    
+
     $strOptionsMonthsStart = "";
     $strOptionsMonthsEnd = "";
     $strOptionsMonthsFlashmob = "";
@@ -278,7 +289,7 @@ class FSP{
       $strOptionsDaysEnd .= '<option value="'.$i.'" '.$strSelectedEnd.'>'.$i.'</option>';
       $strOptionsDaysFlashmob .= '<option value="'.$i.'" '.$strSelectedFlashmob.'>'.$i.'</option>';
     }
-    
+
     $strSeasonPlaceholder = ($this->bIsSeason) ? '%%inSeason%% %%labelCurrentSeason%%' : '%%outOfSeason%% %%labelNextSeason%%';
     echo str_replace(
       array(
@@ -321,11 +332,11 @@ class FSP{
               </th>
             </tr>
           </table>
-          
+
           <span style="">
             <input id="save-fsp-options-bottom" class="button button-primary left button-large" name="save-fsp-options" type="submit" value="%%saveButtonLabel%%"  />
           </span>
-          
+
         </form>
         <h2 class="shortcode-examples-h2">' . __( "Shortcode Examples", "fsp" ) . '</h2>
         <div class="shortcode-examples">' . PHP_EOL
@@ -355,7 +366,7 @@ class FSP{
         </div><!-- .shortcode-examples -->
       </div><!-- .wrap -->'.PHP_EOL;
   }
-  
+
   private function save_option_page_options( $aPostedOptions ) {
     // echo "<pre>" .var_export($aPostedOptions, true). "</pre>";
     $aOptionsToSave = array(
@@ -378,7 +389,7 @@ class FSP{
 //   public function getStats() {
 //     return $this->aStats;
 //   }
-  
+
   public function allstats( $aAttributes = array() ) {
     return "<pre>" .var_export($this->aStats, true). "</pre>";
   }
@@ -396,7 +407,7 @@ class FSP{
     $strFormat = isset($aAttributes['format']) ? $aAttributes['format'] : 'j.n.Y G:i:s';
     return date( $strFormat, intval( $iUpdateTimestamp ));
   }
-  
+
   public function counter( $aAttributes = array() ) {
     if (isset($aAttributes['what']) && in_array( $aAttributes['what'], $this->aFields )) {
       $strTargetField = $aAttributes['what'];
@@ -404,7 +415,7 @@ class FSP{
       $strTargetField = $this->strDefaultField;
     }
     $strTarget = $this->get_stats_field( $aAttributes, $strTargetField );
-    
+
     $aAttributes['target'] = $strTarget;
     $aShortCodeAttributes = array();
     foreach ($aAttributes as $key => $val) {
@@ -415,7 +426,7 @@ class FSP{
     $strFullShortcode = '[us_counter '.$strShortCodeAttributes.']';
     return do_shortcode($strFullShortcode);
   }
-  
+
   private function get_stats_field( $aAttributes, $strField, $mixDefault = 0 ) {
     $iYear = $this->get_year_attribute( $aAttributes );
     if (!isset($this->aStats[$iYear]) || !isset($this->aStats[$iYear][$strField])) {
@@ -461,7 +472,7 @@ class FSP{
     }
     return $iYear;
   }
-  
+
   private function get_current_year() {
     $iSeasonEndMonth = $this->aOptions["iSeasonEndMonth"];
     $iSeasonEndDay = $this->aOptions["iSeasonEndDay"];
@@ -478,22 +489,22 @@ class FSP{
       return $iYearNow + 1;
     }
   }
-  
+
   private function isSeason() {
     $iSeasonStartMonth = $this->aOptions["iSeasonStartMonth"];
     $iSeasonStartDay = $this->aOptions["iSeasonStartDay"];
     $iSeasonStart = $iSeasonStartMonth * 100 + $iSeasonStartDay;
-    
+
     $iSeasonEndMonth = $this->aOptions["iSeasonEndMonth"];
     $iSeasonEndDay = $this->aOptions["iSeasonEndDay"];
     $iSeasonEnd = $iSeasonEndMonth * 100 + $iSeasonEndDay;
-    
+
     $iMonthDayNow = intval(date( 'n' )) * 100 + intval(date( 'j' ));
-    
+
     if ($iSeasonStart == $iSeasonEnd ) {
       return true;
     } elseif ($iSeasonStart < $iSeasonEnd && ($iSeasonStart > $iMonthDayNow || $iSeasonEnd < $iMonthDayNow)) {
-      // We are NOT BETWEEN start and end // 
+      // We are NOT BETWEEN start and end //
       return false;
     } elseif ($iSeasonStart > $iSeasonEnd && ($iSeasonEnd < $iMonthDayNow && $iSeasonStart > $iMonthDayNow)) {
       // We are BETWEEN end and start //
